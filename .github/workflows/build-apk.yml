@@ -3,7 +3,6 @@ name: Build APK
 on:
   push:
     branches: [ main, master ]
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -26,14 +25,22 @@ jobs:
         with:
           gradle-version: 8.10.2
 
-      # Cari otomatis folder yang berisi settings.gradle.kts
-      # (jalan baik file proyek ada di root maupun di subfolder)
+      # Ekstrak file .zip di root repo (jika ada)
+      - name: Unzip source
+        run: |
+          for Z in ./*.zip; do
+            [ -f "$Z" ] || continue
+            echo "Extracting $Z"
+            unzip -oq "$Z" -d ./_src
+          done
+
+      # Cari folder yang berisi settings.gradle.kts
       - name: Detect project directory
         id: proj
         run: |
-          FILE=$(find . -maxdepth 3 \( -name settings.gradle.kts -o -name settings.gradle \) | head -n 1)
+          FILE=$(find . -maxdepth 4 \( -name settings.gradle.kts -o -name settings.gradle \) | head -n 1)
           if [ -z "$FILE" ]; then
-            echo "settings.gradle(.kts) tidak ditemukan di repo"
+            echo "settings.gradle(.kts) tidak ditemukan. Upload file zip proyek ke root repo."
             exit 1
           fi
           DIR=$(dirname "$FILE")
