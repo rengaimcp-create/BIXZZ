@@ -3,27 +3,51 @@ name: Build APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 30
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
 
+      # Cari otomatis folder yang berisi settings.gradle.kts
+      # (jalan baik file proyek ada di root maupun di subfolder)
+      - name: Detect project directory
+        id: proj
+        run: |
+          FILE=$(find . -maxdepth 3 \( -name settings.gradle.kts -o -name settings.gradle \) | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "settings.gradle(.kts) tidak ditemukan di repo"
+            exit 1
+          fi
+          DIR=$(dirname "$FILE")
+          echo "Project dir: $DIR"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
+        working-directory: ${{ steps.proj.outputs.dir }}
         run: gradle assembleDebug --stacktrace
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: KAKORO_INJECTOR-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.proj.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          
